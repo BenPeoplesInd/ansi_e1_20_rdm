@@ -176,13 +176,19 @@ pub struct Pkt {
     pub port_or_response_type : u8,
     pub message_count : u8,
     pub subdevice : u16,
-    pub mdb : Vec<u8>,
+    pub cc : u8, // Command Class
+    pub pid : u16, // PID
+    pub pdl : u8, // PDL
+    pub pd : Vec<u8>,
     pub checksum : u16
 }
 
-// Next steps here is to decide on a format for mdb.
-// I think more apropriate will be an ENUM of variuos structus
-// There's a few common MDB formats that can be encoded as enums
-// I think we *either* have a generic PD with CC/PID/PDL or we 
-// have enums for each packet type we support
-// I'm not sure which approach is better.
+/// DiscoveryResponse packet data
+/// None == no response received
+/// One == a single UID was received with a valid checksum
+/// Some == Data was received, but it was invalid 
+pub enum DiscoveryResponse {
+    None,
+    One(Uid),
+    Some
+}
