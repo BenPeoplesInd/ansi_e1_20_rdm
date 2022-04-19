@@ -1,4 +1,9 @@
 #![allow(dead_code)]
+#![feature(int_abs_diff)]
+
+use std::fmt;
+use core::cmp::Ordering;
+use core::cmp::min;
 
 #[cfg(test)]
 mod tests {
@@ -158,9 +163,110 @@ const POWER_ON_SELF_TEST                         : u16 = 0x1044; /* Defined in A
 /// This contains the manufacturer and device ids
 /// Implementations will include the ability to format as MMMM:DDDDDDDD as well as strings of bytes
 /// 
+#[derive(Copy, Clone)]
 pub struct Uid {
     pub mfg : u16,
     pub dev : u32
+}
+
+impl Uid {
+
+    pub fn new(mfg : u16, dev : u32) -> Uid {
+        Uid { mfg , dev }
+    }
+
+    pub fn set_mfg(mut self, mfg_id: u16) -> () {
+        self.mfg = mfg_id;
+    }
+
+    pub fn set_dev(mut self, dev_id: u32) -> () {
+        self.dev = dev_id;
+    }
+
+    pub fn get_mfg(self) -> u16 {
+        self.mfg
+    }
+
+    pub fn get_dev(self) -> u32 {
+        self.dev
+    }
+
+    pub fn get_as_64(self) -> u64 {
+        ((self.mfg as u64) << 32) + (self.dev as u64)
+    }
+
+    pub fn set_from_64(mut self, val: u64) -> () {
+        println!("Val: {} mfg: {} dev: {}",val,(val >> 32) as u16,val as u32);
+        self.mfg = (val >> 32) as u16;
+        self.dev = val as u32;
+        println!("mfg: {} dev: {}",self.mfg,self.dev);
+    }
+
+    pub fn new_from_64(val: u64) -> Uid {
+        Uid {
+            mfg : (val >> 32) as u16,
+            dev : val as u32
+        }
+    }
+
+    pub fn get_midpoint(self, top: &Uid) -> Uid {
+        if self == *top {
+            return self;
+        }
+        // if self.mfg == top.mfg {
+        //     return Uid::new(self.mfg,self.dev.abs_diff(top.dev)/2 + min(self.dev,top.dev));
+        // } 
+        // else {
+        //     return Uid::new(self.mfg.abs_diff(top.mfg)/2 + min(self.mfg,top.mfg),self.dev);
+        // }
+
+        let bot_64 : u64 = self.get_as_64();
+        let top_64 : u64 = top.get_as_64();
+
+        // println!("top_64: {} bot_64: {}",top_64,bot_64);
+
+        let mid_64 : u64 = (top_64.abs_diff(bot_64) / 2 ) + min(top_64,bot_64);
+
+        // println!("Midpoint: {}",mid_64);
+
+
+
+
+        // let bot_64 : u64 = self.get_as_64();
+        // let top_64 : u64 = top.get_as_64();
+
+        // // let retval = Uid::new(0,0);
+
+        // println!("Halfway between {} and {}",top_64,bot_64);
+
+        // if top_64 > bot_64 {
+        //     // println!("Result is {}", ((top_64 - bot_64) / 2 + bot_64));
+        //     return Uid::new_from_64((top_64 - bot_64) / 2 + bot_64);
+        // } 
+        // if bot_64 > top_64 {
+        //     return Uid::new_from_64((bot_64 - top_64) / 2 + top_64);
+        // }
+        
+        Uid::new_from_64(mid_64)
+
+    }
+}
+
+impl fmt::Display for Uid {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Write strictly the first element into the supplied output
+        // stream: `f`. Returns `fmt::Result` which indicates whether the
+        // operation succeeded or failed. Note that `write!` uses syntax which
+        // is very similar to `println!`.
+        write!(f, "{:04X}:{:08X}", self.mfg, self.dev)
+    }
+}
+
+impl fmt::Debug for Uid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04X}:{:08X}", self.mfg, self.dev)
+    }
 }
 
 /// Packet Structure
@@ -191,4 +297,120 @@ pub enum DiscoveryResponse {
     None,
     One(Uid),
     Some
+}
+
+impl PartialEq for Uid {
+    fn eq(&self, other: &Self) -> bool {
+        self.dev == other.dev && self.mfg == other.mfg
+    }
+}
+
+// Just compare them as 64s
+impl PartialOrd for Uid {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.mfg == other.mfg { // if the mfg ids match, return the comparison between devices
+            return self.dev.partial_cmp(&other.dev);
+        } else {
+            return self.mfg.partial_cmp(&other.mfg); // otherwise just compare devices
+        }
+    }
+}
+
+fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid) -> DiscoveryResponse {
+
+    let mut buffer : [u8;256] = [0;256];
+
+    f(&buffer[..]);
+
+    /*
+    139) "3638:08101AD8"
+    140) "646F:000E8E22"
+    141) "646F:000FB190"
+    142) "3638:27106D31"
+    143) "3638:0B101307"
+    144) "646F:000FB118"
+    145) "6574:1B69D0FE"
+    146) "646F:000FA98D"
+    147) "3638:4110280F"
+    148) "3638:0B101323"
+    */
+
+    let uid_list : Vec<Uid> = vec![Uid::new(0x3638,0x08101AD8),
+    Uid::new(0x646F,0x000E8E22),
+    Uid::new(0x646F,0x000FB190),
+    Uid::new(0x3638,0x27106D31),
+    Uid::new(0x3638,0x0B101307),
+    Uid::new(0x646F,0x000FB118),
+    Uid::new(0x6574,0x1B69D0FE),
+    Uid::new(0x646F,0x000FA98D),
+    Uid::new(0x3638,0x4110280F),
+    Uid::new(0x3638,0x0B101323)];
+
+    let mut uid_found : Vec<Uid> = Vec::new();
+
+
+    for uid in uid_list {
+        if (uid <= *max) && (uid >= *min) {
+            // println!("Checking between {} and {} and found {}",min,max,uid);
+            uid_found.push(uid);
+        }
+    }
+
+    if uid_found.len() == 0 {
+        DiscoveryResponse::None
+    } else if uid_found.len() == 1 {
+        DiscoveryResponse::One(uid_found[0])
+    } else {
+        DiscoveryResponse::Some
+    }
+
+
+}
+
+/// Runs the discovery algorithm.
+/// 0. Optionally: Unmute all (out of scope)
+/// 1. Do allcall discovery.   If no response, then return empty Vec If response, go to 2
+/// 2. Check left-hand side of tree and gather UIDs
+/// 3. Check right-hand side of tree and gather UIDs
+/// 4. Concatenate and return
+pub fn do_discovery_algo(f: fn(&[u8]) -> Option<&[u8]>) -> Vec<Uid> {
+
+    let min : Uid = Uid::new(0,0); 
+    let max : Uid = Uid::new(0x7FFF, 0xFFFF_FFFF);
+
+    let tod = do_discovery_recursion(f, &min, &max);
+
+    return tod;
+}
+
+fn do_discovery_recursion(f: fn(&[u8]) -> Option<&[u8]>, min: &Uid, max: &Uid) -> Vec<Uid> {
+    let mut tod : Vec<Uid> = Vec::new();
+
+    println!("do_discovery_recursion({},{})",min,max);
+
+    match do_discovery_node(f,min, max) {
+        DiscoveryResponse::None => { 
+            return tod; // nothing in this branch, go back up.
+        },
+        DiscoveryResponse::One(found_uid) => {
+            println!("Found {}, muting it.",found_uid);
+            // FIXME: add mute message here
+            tod.push(found_uid);
+            return tod; // only one thing here, return it.
+         },
+        DiscoveryResponse::Some => { 
+            // println!("Found some responders, digging deeper");
+            // need to dig deeper, so don't return.
+        }
+    }
+
+    let mid = min.get_midpoint(max);
+
+    // println!("Midpoint is {}", mid);
+
+    tod.append(do_discovery_recursion(f,min,&mid).as_mut());
+    tod.append(do_discovery_recursion(f,&mid,max).as_mut());
+    
+    return tod;
+
 }
