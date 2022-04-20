@@ -7,32 +7,70 @@ use core::cmp::min;
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn it_works() {
         let result = 2 + 2;
         assert_eq!(result, 4);
     }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let mut testpkt = Pkt::new();
+
+        testpkt.message_length = 25;
+        testpkt.destination = Uid::new(0x1234, 0x56789ABC);
+        testpkt.source = Uid::new(0xCBA9, 0x87654321);
+        testpkt.port_or_response_type = 1;
+        testpkt.cc = GET_COMMAND;
+        testpkt.pid = STATUS_MESSAGES;
+        testpkt.pdl = 1;
+        testpkt.pd = vec![0x55];
+    
+        testpkt.set_checksum();
+    
+        println!("{:?}",testpkt);
+    
+        assert_eq!(true,testpkt.test_checksum());
+    
+        let buf = testpkt.serialize();
+    
+        println!("{:X?}",buf);
+    
+        let testpkt2 = Pkt::deserialize(buf);
+    
+        println!("{:?}",testpkt2);
+    
+        let testpkt2 = testpkt2.unwrap();
+
+        assert_eq!(true,testpkt2.test_checksum());
+
+        assert_eq!(testpkt.checksum,testpkt2.checksum); // Verify that the two checksums actually match
+
+    }
+
 }
 
-// A big ol table of constants
-const SC_RDM : u8                       = 0xCC;
-const SC_SUB_MESSAGE : u8               = 0x01;
+// A big ol table of pub constants
+pub const SC_RDM : u8                       = 0xCC;
+pub const SC_SUB_MESSAGE : u8               = 0x01;
 
-const SUB_DEVICE_ALL_CALL : u16         = 0xFFFF;
+pub const SUB_DEVICE_ALL_CALL : u16         = 0xFFFF;
 
 // Table A-1 : Command Class Defines
-const DISCOVERY_COMMAND : u8            = 0x10;
-const DISCOVERY_COMMAND_RESPONSE : u8   = 0x11;
-const GET_COMMAND : u8                  = 0x20;
-const GET_COMMAND_RESPONSE : u8         = 0x21;
-const SET_COMMAND : u8                  = 0x30;
-const SET_COMMAND_RESPONSE : u8         = 0x31;
+pub const DISCOVERY_COMMAND : u8            = 0x10;
+pub const DISCOVERY_COMMAND_RESPONSE : u8   = 0x11;
+pub const GET_COMMAND : u8                  = 0x20;
+pub const GET_COMMAND_RESPONSE : u8         = 0x21;
+pub const SET_COMMAND : u8                  = 0x30;
+pub const SET_COMMAND_RESPONSE : u8         = 0x31;
 
 // Table A-2: Response Type Defines 
-const RESPONSE_TYPE_ACK : u8            = 0x00;
-const RESPONSE_TYPE_ACK_TIMER : u8      = 0x01;
-const RESPONSE_TYPE_NACK_REASON : u8    = 0x02;
-const RESPONSE_TYPE_ACK_OVERFLOW : u8   = 0x03;
+pub const RESPONSE_TYPE_ACK : u8            = 0x00;
+pub const RESPONSE_TYPE_ACK_TIMER : u8      = 0x01;
+pub const RESPONSE_TYPE_NACK_REASON : u8    = 0x02;
+pub const RESPONSE_TYPE_ACK_OVERFLOW : u8   = 0x03;
 
 // Table A-3: Table A-3: RDM Categories/Parameter ID Defines
 // These are almost exclusively lifted from here: https://github.com/ETCLabs/ETCDmxTool/blob/33f9aafcb7f0f78f59fc8ad3441878762202330a/src/rdm/estardm.h
@@ -63,100 +101,100 @@ const RESPONSE_TYPE_ACK_OVERFLOW : u8   = 0x03;
 /* Table A-3: RDM Parameter ID's (Slots 21-22)          */
 /********************************************************/
 // Category - Network Management 
-const DISC_UNIQUE_BRANCH                           : u16 = 0x0001;
-const DISC_MUTE                                    : u16 = 0x0002;
-const DISC_UN_MUTE                                 : u16 = 0x0003;
-const PROXIED_DEVICES                              : u16 = 0x0010;
-const PROXIED_DEVICE_COUNT                         : u16 = 0x0011;
-const COMMS_STATUS                                 : u16 = 0x0015;
+pub const DISC_UNIQUE_BRANCH                           : u16 = 0x0001;
+pub const DISC_MUTE                                    : u16 = 0x0002;
+pub const DISC_UN_MUTE                                 : u16 = 0x0003;
+pub const PROXIED_DEVICES                              : u16 = 0x0010;
+pub const PROXIED_DEVICE_COUNT                         : u16 = 0x0011;
+pub const COMMS_STATUS                                 : u16 = 0x0015;
 
 // Category - Status Collection    
-const QUEUED_MESSAGE                               : u16 = 0x0020; /* See Table A-4                                              */
-const STATUS_MESSAGES                              : u16 = 0x0030; /* See Table A-4                                              */
-const STATUS_ID_DESCRIPTION                        : u16 = 0x0031;
-const CLEAR_STATUS_ID                              : u16 = 0x0032;
-const SUB_DEVICE_STATUS_REPORT_THRESHOLD           : u16 = 0x0033; /* See Table A-4                                              */
+pub const QUEUED_MESSAGE                               : u16 = 0x0020; /* See Table A-4                                              */
+pub const STATUS_MESSAGES                              : u16 = 0x0030; /* See Table A-4                                              */
+pub const STATUS_ID_DESCRIPTION                        : u16 = 0x0031;
+pub const CLEAR_STATUS_ID                              : u16 = 0x0032;
+pub const SUB_DEVICE_STATUS_REPORT_THRESHOLD           : u16 = 0x0033; /* See Table A-4                                              */
 
 // Category - RDM Information     
-const SUPPORTED_PARAMETERS                         : u16 = 0x0050; /* Support required only if supporting Parameters beyond the minimum required set.*/
-const PARAMETER_DESCRIPTION                        : u16 = 0x0051; /* Support required for Manufacturer-Specific PIDs exposed in SUPPORTED_PARAMETERS message */
+pub const SUPPORTED_PARAMETERS                         : u16 = 0x0050; /* Support required only if supporting Parameters beyond the minimum required set.*/
+pub const PARAMETER_DESCRIPTION                        : u16 = 0x0051; /* Support required for Manufacturer-Specific PIDs exposed in SUPPORTED_PARAMETERS message */
 
 // Category - Product Information  
-const DEVICE_INFO                                  : u16 = 0x0060;
-const PRODUCT_DETAIL_ID_LIST                       : u16 = 0x0070;
-const DEVICE_MODEL_DESCRIPTION                     : u16 = 0x0080;
-const MANUFACTURER_LABEL                           : u16 = 0x0081;
-const DEVICE_LABEL                                 : u16 = 0x0082;
-const FACTORY_DEFAULTS                             : u16 = 0x0090;
-const LANGUAGE_CAPABILITIES                        : u16 = 0x00A0;
-const LANGUAGE                                     : u16 = 0x00B0;
-const SOFTWARE_VERSION_LABEL                       : u16 = 0x00C0;
-const BOOT_SOFTWARE_VERSION_ID                     : u16 = 0x00C1;
-const BOOT_SOFTWARE_VERSION_LABEL                  : u16 = 0x00C2;
+pub const DEVICE_INFO                                  : u16 = 0x0060;
+pub const PRODUCT_DETAIL_ID_LIST                       : u16 = 0x0070;
+pub const DEVICE_MODEL_DESCRIPTION                     : u16 = 0x0080;
+pub const MANUFACTURER_LABEL                           : u16 = 0x0081;
+pub const DEVICE_LABEL                                 : u16 = 0x0082;
+pub const FACTORY_DEFAULTS                             : u16 = 0x0090;
+pub const LANGUAGE_CAPABILITIES                        : u16 = 0x00A0;
+pub const LANGUAGE                                     : u16 = 0x00B0;
+pub const SOFTWARE_VERSION_LABEL                       : u16 = 0x00C0;
+pub const BOOT_SOFTWARE_VERSION_ID                     : u16 = 0x00C1;
+pub const BOOT_SOFTWARE_VERSION_LABEL                  : u16 = 0x00C2;
 
 // Category - DMX512 Setup         
-const DMX_PERSONALITY                              : u16 = 0x00E0;
-const DMX_PERSONALITY_DESCRIPTION                  : u16 = 0x00E1;
-const DMX_START_ADDRESS                            : u16 = 0x00F0; /* Support required if device uses a DMX512 Slot.             */
-const SLOT_INFO                                    : u16 = 0x0120;
-const SLOT_DESCRIPTION                             : u16 = 0x0121;
-const DEFAULT_SLOT_VALUE                           : u16 = 0x0122;
-const DMX_BLOCK_ADDRESS                          : u16 = 0x0140; /* Defined in ANSI E1.37-1 document                           */
-const DMX_FAIL_MODE                              : u16 = 0x0141; /* Defined in ANSI E1.37-1 document                           */
-const DMX_STARTUP_MODE                           : u16 = 0x0142; /* Defined in ANSI E1.37-1 document                           */
+pub const DMX_PERSONALITY                              : u16 = 0x00E0;
+pub const DMX_PERSONALITY_DESCRIPTION                  : u16 = 0x00E1;
+pub const DMX_START_ADDRESS                            : u16 = 0x00F0; /* Support required if device uses a DMX512 Slot.             */
+pub const SLOT_INFO                                    : u16 = 0x0120;
+pub const SLOT_DESCRIPTION                             : u16 = 0x0121;
+pub const DEFAULT_SLOT_VALUE                           : u16 = 0x0122;
+pub const DMX_BLOCK_ADDRESS                          : u16 = 0x0140; /* Defined in ANSI E1.37-1 document                           */
+pub const DMX_FAIL_MODE                              : u16 = 0x0141; /* Defined in ANSI E1.37-1 document                           */
+pub const DMX_STARTUP_MODE                           : u16 = 0x0142; /* Defined in ANSI E1.37-1 document                           */
 
 
 // Category - Sensors              
-const SENSOR_DEFINITION                            : u16 = 0x0200;
-const SENSOR_VALUE                                 : u16 = 0x0201;
-const RECORD_SENSORS                               : u16 = 0x0202;
+pub const SENSOR_DEFINITION                            : u16 = 0x0200;
+pub const SENSOR_VALUE                                 : u16 = 0x0201;
+pub const RECORD_SENSORS                               : u16 = 0x0202;
 
 // Category - Dimmer Settings      
-const DIMMER_INFO                                : u16 = 0x0340;
-const MINIMUM_LEVEL                              : u16 = 0x0341;
-const MAXIMUM_LEVEL                              : u16 = 0x0342;
-const CURVE                                      : u16 = 0x0343;
-const CURVE_DESCRIPTION                          : u16 = 0x0344; /* Support required if CURVE is supported                     */
-const OUTPUT_RESPONSE_TIME                       : u16 = 0x0345;
-const OUTPUT_RESPONSE_TIME_DESCRIPTION           : u16 = 0x0346; /* Support required if OUTPUT_RESPONSE_TIME is supported      */
-const MODULATION_FREQUENCY                       : u16 = 0x0347;
-const MODULATION_FREQUENCY_DESCRIPTION           : u16 = 0x0348; /* Support required if MODULATION_FREQUENCY is supported      */
+pub const DIMMER_INFO                                : u16 = 0x0340;
+pub const MINIMUM_LEVEL                              : u16 = 0x0341;
+pub const MAXIMUM_LEVEL                              : u16 = 0x0342;
+pub const CURVE                                      : u16 = 0x0343;
+pub const CURVE_DESCRIPTION                          : u16 = 0x0344; /* Support required if CURVE is supported                     */
+pub const OUTPUT_RESPONSE_TIME                       : u16 = 0x0345;
+pub const OUTPUT_RESPONSE_TIME_DESCRIPTION           : u16 = 0x0346; /* Support required if OUTPUT_RESPONSE_TIME is supported      */
+pub const MODULATION_FREQUENCY                       : u16 = 0x0347;
+pub const MODULATION_FREQUENCY_DESCRIPTION           : u16 = 0x0348; /* Support required if MODULATION_FREQUENCY is supported      */
 
 // Category - Power/Lamp Settings  
-const DEVICE_HOURS                                 : u16 = 0x0400;
-const LAMP_HOURS                                   : u16 = 0x0401;
-const LAMP_STRIKES                                 : u16 = 0x0402;
-const LAMP_STATE                                   : u16 = 0x0403; /* See Table A-8                                              */
-const LAMP_ON_MODE                                 : u16 = 0x0404; /* See Table A-9                                              */
-const DEVICE_POWER_CYCLES                          : u16 = 0x0405;
-const BURN_IN									  : u16 = 0x0440; /* Defined in ANSI E1.37-1                                    */
+pub const DEVICE_HOURS                                 : u16 = 0x0400;
+pub const LAMP_HOURS                                   : u16 = 0x0401;
+pub const LAMP_STRIKES                                 : u16 = 0x0402;
+pub const LAMP_STATE                                   : u16 = 0x0403; /* See Table A-8                                              */
+pub const LAMP_ON_MODE                                 : u16 = 0x0404; /* See Table A-9                                              */
+pub const DEVICE_POWER_CYCLES                          : u16 = 0x0405;
+pub const BURN_IN									  : u16 = 0x0440; /* Defined in ANSI E1.37-1                                    */
 
 // Category - Display Settings     
-const DISPLAY_INVERT                               : u16 = 0x0500;
-const DISPLAY_LEVEL                                : u16 = 0x0501;
+pub const DISPLAY_INVERT                               : u16 = 0x0500;
+pub const DISPLAY_LEVEL                                : u16 = 0x0501;
 
 // Category - Configuration        
-const PAN_INVERT                                   : u16 = 0x0600;
-const TILT_INVERT                                  : u16 = 0x0601;
-const PAN_TILT_SWAP                                : u16 = 0x0602;
-const REAL_TIME_CLOCK                              : u16 = 0x0603;
-const LOCK_PIN                                   : u16 = 0x0640; /* Defined in ANSI E1.37-1                                    */
-const LOCK_STATE                                 : u16 = 0x0641; /* Defined in ANSI E1.37-1                                    */
-const LOCK_STATE_DESCRIPTION                     : u16 = 0x0642; /* Support required if MODULATION_FREQUENCY is supported      */
+pub const PAN_INVERT                                   : u16 = 0x0600;
+pub const TILT_INVERT                                  : u16 = 0x0601;
+pub const PAN_TILT_SWAP                                : u16 = 0x0602;
+pub const REAL_TIME_CLOCK                              : u16 = 0x0603;
+pub const LOCK_PIN                                   : u16 = 0x0640; /* Defined in ANSI E1.37-1                                    */
+pub const LOCK_STATE                                 : u16 = 0x0641; /* Defined in ANSI E1.37-1                                    */
+pub const LOCK_STATE_DESCRIPTION                     : u16 = 0x0642; /* Support required if MODULATION_FREQUENCY is supported      */
 
 // Category - Control              
-const IDENTIFY_DEVICE                              : u16 = 0x1000;
-const RESET_DEVICE                                 : u16 = 0x1001;
-const POWER_STATE                                  : u16 = 0x1010; /* See Table A-11                                              */
-const PERFORM_SELFTEST                             : u16 = 0x1020; /* See Table A-10                                              */
-const SELF_TEST_DESCRIPTION                        : u16 = 0x1021;
-const CAPTURE_PRESET                               : u16 = 0x1030;
-const PRESET_PLAYBACK                              : u16 = 0x1031; /* See Table A-7                                               */
-const IDENTIFY_MODE                              : u16 = 0x1040; /* Defined in ANSI E1.37-1                                     */
-const PRESET_INFO                                : u16 = 0x1041; /* Defined in ANSI E1.37-1                                     */
-const PRESET_STATUS                              : u16 = 0x1042; /* Defined in ANSI E1.37-1                                     */
-const PRESET_MERGEMODE                           : u16 = 0x1043; /* See E1.37-1 Table A-3                                       */
-const POWER_ON_SELF_TEST                         : u16 = 0x1044; /* Defined in ANSI E1.37-1                                     */
+pub const IDENTIFY_DEVICE                              : u16 = 0x1000;
+pub const RESET_DEVICE                                 : u16 = 0x1001;
+pub const POWER_STATE                                  : u16 = 0x1010; /* See Table A-11                                              */
+pub const PERFORM_SELFTEST                             : u16 = 0x1020; /* See Table A-10                                              */
+pub const SELF_TEST_DESCRIPTION                        : u16 = 0x1021;
+pub const CAPTURE_PRESET                               : u16 = 0x1030;
+pub const PRESET_PLAYBACK                              : u16 = 0x1031; /* See Table A-7                                               */
+pub const IDENTIFY_MODE                              : u16 = 0x1040; /* Defined in ANSI E1.37-1                                     */
+pub const PRESET_INFO                                : u16 = 0x1041; /* Defined in ANSI E1.37-1                                     */
+pub const PRESET_STATUS                              : u16 = 0x1042; /* Defined in ANSI E1.37-1                                     */
+pub const PRESET_MERGEMODE                           : u16 = 0x1043; /* See E1.37-1 Table A-3                                       */
+pub const POWER_ON_SELF_TEST                         : u16 = 0x1044; /* Defined in ANSI E1.37-1                                     */
 
 
 /// UID Struct
@@ -170,6 +208,31 @@ pub struct Uid {
 }
 
 impl Uid {
+
+    pub fn serialize(self) -> [u8; 6] {
+        let mfg : [u8; 2] = self.mfg.to_be_bytes();
+        let dev : [u8; 4] = self.dev.to_be_bytes();
+
+        let mut ret : [u8; 6] = [0; 6];
+
+        ret[0..2].clone_from_slice(&mfg);
+        ret[2..].clone_from_slice(&dev);
+
+        return ret;
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Uid {
+
+        let mut mfg_array = [0u8; 2];
+        let mut dev_array = [0u8; 4];
+
+        mfg_array.clone_from_slice(&data[0..2]);
+        dev_array.clone_from_slice(&data[2..6]);
+
+
+        Uid { mfg: u16::from_be_bytes(mfg_array),
+            dev: u32::from_be_bytes(dev_array)}
+    }
 
     pub fn new(mfg : u16, dev : u32) -> Uid {
         Uid { mfg , dev }
@@ -253,12 +316,7 @@ impl Uid {
 }
 
 impl fmt::Display for Uid {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Write strictly the first element into the supplied output
-        // stream: `f`. Returns `fmt::Result` which indicates whether the
-        // operation succeeded or failed. Note that `write!` uses syntax which
-        // is very similar to `println!`.
         write!(f, "{:04X}:{:08X}", self.mfg, self.dev)
     }
 }
@@ -272,6 +330,7 @@ impl fmt::Debug for Uid {
 /// Packet Structure
 /// This includes all fields (including ones can calculate)
 /// This allows us to use it as a container format for incoming packets to validate them
+#[derive(Clone)]
 pub struct Pkt {
     pub start : u8,
     pub substart : u8,
@@ -287,6 +346,123 @@ pub struct Pkt {
     pub pdl : u8, // PDL
     pub pd : Vec<u8>,
     pub checksum : u16
+}
+
+impl fmt::Debug for Pkt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:02X} {:02X}\nLength: {}\nDest: {}\nSource: {}\nTN: {:02X} RT: {:02X} MC: {:02X}\nSD: {}\nCC: {:02X} PID: {:04X} PDL: {}\nPD: {:?}\nChecksum: {:04X}", 
+        self.start, self.substart, 
+        self.message_length,
+        self.destination,
+        self.source,
+        self.tn, self.port_or_response_type, self.message_count,
+        self.subdevice,
+        self.cc, self.pid, self.pdl,
+        self.pd,
+        self.checksum
+    )
+    }
+}
+
+impl Pkt {
+    pub fn new() -> Pkt {
+        Pkt { start: SC_RDM, substart: SC_SUB_MESSAGE, message_length: 0, destination: Uid::new(0,0), source: Uid::new(0,0), tn: 0, 
+            port_or_response_type: 0, message_count: 0, subdevice: 0, cc: 0, pid: 0, pdl: 0, pd: Vec::new(), checksum: 0 }
+    }
+
+    pub fn set_checksum(&mut self) -> u16 {
+        let mut checksum : u16 = 0;
+
+        // let mut temp_pkt = self.clone();
+
+        self.checksum = 0;
+
+        let data = self.serialize();
+
+        for byte in data {
+            checksum = checksum.overflowing_add(byte as u16).0;
+        }
+
+        self.checksum = checksum;
+
+        return checksum;
+
+    }
+
+    pub fn test_checksum(&self) -> bool {
+        let mut checksum : u16 = 0;
+        let mut test_packet = self.clone();
+        test_packet.checksum = 0;
+
+        let data = test_packet.serialize();
+
+        for byte in data {
+            checksum = checksum.overflowing_add(byte as u16).0;
+        }
+
+        self.checksum == checksum
+
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+
+        data.push(self.start);
+        data.push(self.substart);
+        data.push(self.message_length);
+        data.extend(self.destination.serialize());
+        data.extend(self.source.serialize());
+        data.push(self.tn);
+        data.push(self.port_or_response_type);
+        data.push(self.message_count);
+        data.extend(self.subdevice.to_be_bytes());
+        data.push(self.cc);
+        data.extend(self.pid.to_be_bytes());
+        data.push(self.pdl);
+        data.extend(self.pd.as_slice());
+        data.extend(self.checksum.to_be_bytes());
+
+        return data;
+    }
+
+    pub fn deserialize(data: Vec<u8>) -> Option<Pkt> {
+        let mut ret = Pkt::new();
+
+        if data.len() < 14 {
+            return None;
+        }
+
+        ret.start = data[0];
+        ret.substart = data[1];
+        ret.message_length = data[2];
+
+        if data.len() != (ret.message_length as usize) + 2 {
+            return None; // May want some more useful errors later
+        }
+
+        ret.destination = Uid::from_bytes(&data[3..9]);
+        ret.source = Uid::from_bytes(&data[9..15]);
+
+        ret.tn = data[15];
+        ret.port_or_response_type = data[16];
+        ret.message_count = data[17];
+        ret.subdevice = u16::from_be_bytes(data[18..20].try_into().unwrap());
+        ret.cc = data[20];
+        ret.pid = u16::from_be_bytes(data[21..23].try_into().unwrap());
+        ret.pdl = data[23];
+        if ret.pdl > 0 {
+            ret.pd.extend(&data[24..((ret.pdl+24) as usize)]);
+        }
+        ret.checksum = u16::from_be_bytes(data[(ret.message_length as usize)..((ret.message_length+2) as usize)].try_into().unwrap());
+
+        return Some(ret);
+    }
+
+    pub fn set_message_length(&mut self) -> u8 {
+        self.message_length = self.pdl + 14;
+        self.message_length
+    }
+
 }
 
 /// DiscoveryResponse packet data
@@ -316,53 +492,88 @@ impl PartialOrd for Uid {
     }
 }
 
-fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid) -> DiscoveryResponse {
+fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid, tn: &mut u8) -> DiscoveryResponse {
 
-    let mut buffer : [u8;256] = [0;256];
+    let mut output_pkt = Pkt::new();
 
-    f(&buffer[..]);
+    output_pkt.destination = Uid::new(0xFFFF,0xFFFF_FFFF);
+    output_pkt.source = Uid::new(0x044E,0);
+    
+    *tn = tn.overflowing_add(1).0;
 
-    /*
-    139) "3638:08101AD8"
-    140) "646F:000E8E22"
-    141) "646F:000FB190"
-    142) "3638:27106D31"
-    143) "3638:0B101307"
-    144) "646F:000FB118"
-    145) "6574:1B69D0FE"
-    146) "646F:000FA98D"
-    147) "3638:4110280F"
-    148) "3638:0B101323"
-    */
+    output_pkt.tn = *tn;
 
-    let uid_list : Vec<Uid> = vec![Uid::new(0x3638,0x08101AD8),
-    Uid::new(0x646F,0x000E8E22),
-    Uid::new(0x646F,0x000FB190),
-    Uid::new(0x3638,0x27106D31),
-    Uid::new(0x3638,0x0B101307),
-    Uid::new(0x646F,0x000FB118),
-    Uid::new(0x6574,0x1B69D0FE),
-    Uid::new(0x646F,0x000FA98D),
-    Uid::new(0x3638,0x4110280F),
-    Uid::new(0x3638,0x0B101323)];
+    output_pkt.port_or_response_type = 0x01;
 
-    let mut uid_found : Vec<Uid> = Vec::new();
+    output_pkt.cc = DISCOVERY_COMMAND;
 
+    output_pkt.pid = DISC_UNIQUE_BRANCH;
 
-    for uid in uid_list {
-        if (uid <= *max) && (uid >= *min) {
-            // println!("Checking between {} and {} and found {}",min,max,uid);
-            uid_found.push(uid);
+    output_pkt.pdl = 0x0C;
+
+    output_pkt.pd.extend(min.serialize());
+    output_pkt.pd.extend(max.serialize());
+
+    output_pkt.set_message_length(); // sets message length from PDL
+    output_pkt.set_checksum(); // sets checksum from the whole packet.
+
+    match f(output_pkt.serialize().as_slice()) {
+        None => {
+            return DiscoveryResponse::None; // No response means no response
         }
+        Some(data) => {
+            let mut device_uid = Uid::new(0,0);
+            let mut checksum : u16 = 0;
+            let mut checksum_calculated : u16 = 0;
+
+            if data.len() == 0 {
+                return DiscoveryResponse::None;
+            }
+
+            if data.len() >= 16 {
+
+                let mut preamble_ptr : usize = 0;
+
+                for byte in data {
+                    preamble_ptr += 1;
+                    if *byte == 0xFE {
+                        continue;
+                    } 
+                    if *byte == 0xAA {
+                        break;
+                    }
+                }
+
+                // Make sure we have enough bytes after the preamble, if not, we have a Some.
+                if data.len() < 16+preamble_ptr {
+                    return DiscoveryResponse::Some;
+                }
+
+                device_uid.mfg = ((data[preamble_ptr] as u16 & data[preamble_ptr+1] as u16) << 8) + (data[preamble_ptr+2] as u16 & data[preamble_ptr+3] as u16);
+                device_uid.dev =    ((data[preamble_ptr+4] as u32 & data[preamble_ptr+5] as u32) << 24) 
+                                    + ((data[preamble_ptr+6] as u32 & data[preamble_ptr+7] as u32) << 16) 
+                                    + ((data[preamble_ptr+8] as u32 & data[preamble_ptr+9] as u32) << 8) 
+                                    + (data[preamble_ptr+10] as u32 & data[preamble_ptr+11] as u32);
+
+                checksum = ((data[preamble_ptr+12] as u16 & data[preamble_ptr+13] as u16) << 8) + (data[preamble_ptr+14] as u16 & data[preamble_ptr+15] as u16);
+
+                for i in preamble_ptr..(preamble_ptr+12) {
+                    checksum_calculated = checksum_calculated.overflowing_add(data[i] as u16).0;
+                }
+                
+                // If the checksum validates, we have a device, if not we return a Some.
+                if checksum == checksum_calculated {
+                    return DiscoveryResponse::One(device_uid);
+                } else {
+                    return DiscoveryResponse::Some;
+                }
+            } else {
+                return DiscoveryResponse::Some; // We got something, but don't know what it is.
+            }
+        }
+
     }
 
-    if uid_found.len() == 0 {
-        DiscoveryResponse::None
-    } else if uid_found.len() == 1 {
-        DiscoveryResponse::One(uid_found[0])
-    } else {
-        DiscoveryResponse::Some
-    }
 
 
 }
@@ -375,28 +586,82 @@ fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid) -> Disc
 /// 4. Concatenate and return
 pub fn do_discovery_algo(f: fn(&[u8]) -> Option<&[u8]>) -> Vec<Uid> {
 
+    let mut tn : u8 = 0;
+
     let min : Uid = Uid::new(0,0); 
     let max : Uid = Uid::new(0x7FFF, 0xFFFF_FFFF);
 
-    let tod = do_discovery_recursion(f, &min, &max);
+    let tod = do_discovery_recursion(f, &min, &max, &mut tn);
 
     return tod;
 }
 
-fn do_discovery_recursion(f: fn(&[u8]) -> Option<&[u8]>, min: &Uid, max: &Uid) -> Vec<Uid> {
+/// Sends a mute message and then returns true if it got an ACK or false if it didn't
+fn send_mute_message(f: fn(&[u8]) -> Option<&[u8]>, uid: &Uid, tn : &mut u8) -> bool {
+    let mut output_pkt = Pkt::new();
+
+    output_pkt.destination = *uid;
+    output_pkt.source = Uid::new(0x044E,0);
+    
+    *tn = tn.overflowing_add(1).0;
+
+    output_pkt.tn = *tn;
+
+    output_pkt.port_or_response_type = 0x01;
+
+    output_pkt.cc = DISCOVERY_COMMAND;
+
+    output_pkt.pid = DISC_MUTE;
+
+    output_pkt.pdl = 0x00;
+
+    output_pkt.set_message_length(); // sets message length from PDL
+    output_pkt.set_checksum(); // sets checksum from the whole packet.
+
+    match f(output_pkt.serialize().as_slice()) {
+        None => return false,
+        Some(data) => {
+            let response_pkt = Pkt::deserialize(data.to_vec());
+
+            match response_pkt {
+                None => return false,
+                Some(data_pkt) => {
+                    if data_pkt.test_checksum() {
+                        if data_pkt.port_or_response_type == RESPONSE_TYPE_ACK 
+                        && data_pkt.source == *uid 
+                        && data_pkt.cc == DISCOVERY_COMMAND_RESPONSE 
+                        && data_pkt.pid == DISC_MUTE {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            }
+
+
+        }
+    }
+
+}
+
+fn do_discovery_recursion(f: fn(&[u8]) -> Option<&[u8]>, min: &Uid, max: &Uid, tn : &mut u8) -> Vec<Uid> {
     let mut tod : Vec<Uid> = Vec::new();
 
     println!("do_discovery_recursion({},{})",min,max);
 
-    match do_discovery_node(f,min, max) {
+    match do_discovery_node(f,min, max, tn) {
         DiscoveryResponse::None => { 
             return tod; // nothing in this branch, go back up.
         },
         DiscoveryResponse::One(found_uid) => {
             println!("Found {}, muting it.",found_uid);
-            // FIXME: add mute message here
-            tod.push(found_uid);
-            return tod; // only one thing here, return it.
+            if send_mute_message(f,&found_uid,tn) {
+                tod.push(found_uid);
+                return tod; // only one thing here, return it.
+            }
          },
         DiscoveryResponse::Some => { 
             // println!("Found some responders, digging deeper");
@@ -408,9 +673,10 @@ fn do_discovery_recursion(f: fn(&[u8]) -> Option<&[u8]>, min: &Uid, max: &Uid) -
 
     // println!("Midpoint is {}", mid);
 
-    tod.append(do_discovery_recursion(f,min,&mid).as_mut());
-    tod.append(do_discovery_recursion(f,&mid,max).as_mut());
+    tod.append(do_discovery_recursion(f,min,&mid, tn).as_mut());
+    tod.append(do_discovery_recursion(f,&mid,max, tn).as_mut());
     
     return tod;
 
 }
+
