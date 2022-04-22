@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 #![feature(int_abs_diff)]
+#[macro_use]
+extern crate log;
+extern crate simplelog;
 
 use std::fmt;
 use core::cmp::Ordering;
@@ -426,10 +429,15 @@ impl Pkt {
     }
 
     pub fn deserialize(data: Vec<u8>) -> Option<Pkt> {
+        
+        // debug!("deserialize({:?})",data);
+
         let mut ret = Pkt::new();
 
         if data.len() < 14 {
+            error!("Not enough data, need at least 14 bytes, have {}",data.len());
             return None;
+            
         }
 
         ret.start = data[0];
@@ -437,6 +445,7 @@ impl Pkt {
         ret.message_length = data[2];
 
         if data.len() != (ret.message_length as usize) + 2 {
+            error!("data.len was incorrect got {} wanted {}",data.len(),ret.message_length+2);
             return None; // May want some more useful errors later
         }
 
@@ -459,7 +468,7 @@ impl Pkt {
     }
 
     pub fn set_message_length(&mut self) -> u8 {
-        self.message_length = self.pdl + 14;
+        self.message_length = self.pdl + 24;
         self.message_length
     }
 
@@ -492,12 +501,12 @@ impl PartialOrd for Uid {
     }
 }
 
-fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid, tn: &mut u8) -> DiscoveryResponse {
+fn do_discovery_node(f: fn(&[u8]) -> Option<Vec<u8>>,my_uid: &Uid, min: &Uid, max: &Uid, tn: &mut u8) -> DiscoveryResponse {
 
     let mut output_pkt = Pkt::new();
 
     output_pkt.destination = Uid::new(0xFFFF,0xFFFF_FFFF);
-    output_pkt.source = Uid::new(0x044E,0);
+    output_pkt.source = my_uid.clone();
     
     *tn = tn.overflowing_add(1).0;
 
@@ -534,7 +543,7 @@ fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid, tn: &mu
 
                 let mut preamble_ptr : usize = 0;
 
-                for byte in data {
+                for byte in &data {
                     preamble_ptr += 1;
                     if *byte == 0xFE {
                         continue;
@@ -584,24 +593,24 @@ fn do_discovery_node(f: fn(&[u8]) -> Option<&[u8]>,min: &Uid, max: &Uid, tn: &mu
 /// 2. Check left-hand side of tree and gather UIDs
 /// 3. Check right-hand side of tree and gather UIDs
 /// 4. Concatenate and return
-pub fn do_discovery_algo(f: fn(&[u8]) -> Option<&[u8]>) -> Vec<Uid> {
+pub fn do_discovery_algo(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid) -> Vec<Uid> {
 
     let mut tn : u8 = 0;
 
     let min : Uid = Uid::new(0,0); 
     let max : Uid = Uid::new(0x7FFF, 0xFFFF_FFFF);
 
-    let tod = do_discovery_recursion(f, &min, &max, &mut tn);
+    let tod = do_discovery_recursion(f, &my_uid, &min, &max, &mut tn);
 
     return tod;
 }
 
 /// Sends a mute message and then returns true if it got an ACK or false if it didn't
-fn send_mute_message(f: fn(&[u8]) -> Option<&[u8]>, uid: &Uid, tn : &mut u8) -> bool {
+fn send_mute_message(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, uid: &Uid, tn : &mut u8) -> bool {
     let mut output_pkt = Pkt::new();
 
     output_pkt.destination = *uid;
-    output_pkt.source = Uid::new(0x044E,0);
+    output_pkt.source = my_uid.clone();
     
     *tn = tn.overflowing_add(1).0;
 
@@ -621,7 +630,7 @@ fn send_mute_message(f: fn(&[u8]) -> Option<&[u8]>, uid: &Uid, tn : &mut u8) -> 
     match f(output_pkt.serialize().as_slice()) {
         None => return false,
         Some(data) => {
-            let response_pkt = Pkt::deserialize(data.to_vec());
+            let response_pkt = Pkt::deserialize(data);
 
             match response_pkt {
                 None => return false,
@@ -647,18 +656,18 @@ fn send_mute_message(f: fn(&[u8]) -> Option<&[u8]>, uid: &Uid, tn : &mut u8) -> 
 
 }
 
-fn do_discovery_recursion(f: fn(&[u8]) -> Option<&[u8]>, min: &Uid, max: &Uid, tn : &mut u8) -> Vec<Uid> {
+fn do_discovery_recursion(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, min: &Uid, max: &Uid, tn : &mut u8) -> Vec<Uid> {
     let mut tod : Vec<Uid> = Vec::new();
 
-    println!("do_discovery_recursion({},{})",min,max);
+    debug!("do_discovery_recursion({},{})",min,max);
 
-    match do_discovery_node(f,min, max, tn) {
+    match do_discovery_node(f,&my_uid,min, max, tn) {
         DiscoveryResponse::None => { 
             return tod; // nothing in this branch, go back up.
         },
         DiscoveryResponse::One(found_uid) => {
-            println!("Found {}, muting it.",found_uid);
-            if send_mute_message(f,&found_uid,tn) {
+            debug!("do_discovery_recursion: Found {}, muting it.",found_uid);
+            if send_mute_message(f,&my_uid,&found_uid,tn) {
                 tod.push(found_uid);
                 return tod; // only one thing here, return it.
             }
@@ -673,8 +682,8 @@ fn do_discovery_recursion(f: fn(&[u8]) -> Option<&[u8]>, min: &Uid, max: &Uid, t
 
     // println!("Midpoint is {}", mid);
 
-    tod.append(do_discovery_recursion(f,min,&mid, tn).as_mut());
-    tod.append(do_discovery_recursion(f,&mid,max, tn).as_mut());
+    tod.append(do_discovery_recursion(f,&my_uid, min,&mid, tn).as_mut());
+    tod.append(do_discovery_recursion(f,&my_uid, &mid,max, tn).as_mut());
     
     return tod;
 
