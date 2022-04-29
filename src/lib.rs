@@ -597,6 +597,28 @@ pub fn do_discovery_algo(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid) -> Vec<U
 
     let mut tn : u8 = 0;
 
+    let mut output_pkt = Pkt::new();
+
+    output_pkt.destination = Uid::new(0xFFFF,0xFFFF_FFFF);
+    output_pkt.source = my_uid.clone();
+    
+    tn = tn.overflowing_add(1).0;
+
+    output_pkt.tn = tn;
+
+    output_pkt.port_or_response_type = 0x01;
+
+    output_pkt.cc = DISCOVERY_COMMAND;
+
+    output_pkt.pid = DISC_UN_MUTE;
+
+    output_pkt.pdl = 0x00;
+
+    output_pkt.set_message_length(); // sets message length from PDL
+    output_pkt.set_checksum(); // sets checksum from the whole packet.
+
+    f(output_pkt.serialize().as_slice()); /// send global unmute
+
     let min : Uid = Uid::new(0,0); 
     let max : Uid = Uid::new(0x7FFF, 0xFFFF_FFFF);
 
