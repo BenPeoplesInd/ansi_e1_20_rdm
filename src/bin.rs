@@ -134,7 +134,7 @@ fn main() {
 
     let my_uid = Uid::new(0x044E,0x01);
 
-    println!("{:?}", do_discovery_algo(fake_rdm,&my_uid));
+    println!("{:?}", do_discovery_algo(fake_rdm,&my_uid,false,false));
 
    
 }

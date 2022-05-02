@@ -7,6 +7,9 @@ extern crate simplelog;
 use std::fmt;
 use core::cmp::Ordering;
 use core::cmp::min;
+use std::str;
+use std::u32;
+use std::u16;
 
 #[cfg(test)]
 mod tests {
@@ -235,6 +238,14 @@ impl Uid {
 
         Uid { mfg: u16::from_be_bytes(mfg_array),
             dev: u32::from_be_bytes(dev_array)}
+    }
+
+    /// Given a UID in the standard format like 044E:123456 it'll generate a UID
+    pub fn from_string(data: String) -> Uid {
+        Uid { 
+            mfg: u16::from_str_radix(&data[0..4],16).unwrap_or(0x00),  
+            dev: u32::from_str_radix(&data[5..], 16).unwrap_or(0x00)            
+        }
     }
 
     pub fn new(mfg : u16, dev : u32) -> Uid {
@@ -490,6 +501,251 @@ impl PartialEq for Uid {
     }
 }
 
+#[derive(Debug)]
+pub struct SensorDefinitionPD {
+    pub id : u8,
+    pub sensor_type : u8,
+    pub unit : u8,
+    pub prefix : u8,
+    pub range_min : i16,
+    pub range_max : i16,
+    pub normal_min : i16,
+    pub normal_max : i16,
+    pub recorded_value : u8,
+    pub description : String
+}
+
+impl SensorDefinitionPD {
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut rv = Vec::new();
+
+        rv.push(self.id);
+        rv.push(self.sensor_type);
+        rv.push(self.unit);
+        rv.push(self.prefix);
+
+        rv.extend(self.range_min.to_be_bytes());
+        rv.extend(self.range_max.to_be_bytes());
+        rv.extend(self.normal_min.to_be_bytes());
+        rv.extend(self.normal_max.to_be_bytes());
+
+        rv.push(self.recorded_value);
+        
+        rv.extend(self.description.as_bytes());
+
+        return rv;
+    }
+
+    pub fn deserialize(data : Vec<u8>) -> Option<SensorDefinitionPD> {
+        if data.len() < 0x0D {
+            return None;
+        }
+
+        let mut pd = SensorDefinitionPD::new();
+
+        pd.id = data[0];
+        pd.sensor_type = data[1];
+        pd.unit = data[2];
+        pd.prefix = data[3];
+
+        pd.range_min = i16::from_be_bytes(data[4..6].try_into().unwrap());
+        pd.range_max = i16::from_be_bytes(data[6..8].try_into().unwrap());
+        pd.normal_min = i16::from_be_bytes(data[8..10].try_into().unwrap());
+        pd.normal_max = i16::from_be_bytes(data[10..12].try_into().unwrap());
+        
+        pd.recorded_value = data[12];
+
+        if data.len() > 0x0D {
+
+            let mut last_index = data.len();
+
+            for i in 13..data.len() {
+                if data[i] == 0x00 { // if it's a null terminated string, truncate here.
+                    last_index = i;
+                    break;
+                }
+            }
+
+            if last_index > 13 {
+                pd.description = str::from_utf8(&data[13..last_index]).unwrap_or("").to_string();
+            }
+        }
+
+        return Some(pd);
+
+    }
+
+    pub fn new() -> SensorDefinitionPD {
+        SensorDefinitionPD { 
+            id: 0, 
+            sensor_type: 0, 
+            unit: 0, 
+            prefix: 0, 
+            range_min: 0, 
+            range_max: 0, 
+            normal_min: 0, 
+            normal_max: 0, 
+            recorded_value: 0, 
+            description: "".to_string() }
+
+    }
+
+
+}
+
+#[derive(Debug)]
+pub struct SensorValuePD {
+    pub id : u8,
+    pub present : i16,
+    pub lowest : i16,
+    pub highest : i16,
+    pub recorded: i16
+}
+
+impl SensorValuePD {
+    pub fn new() -> SensorValuePD {
+        SensorValuePD { id: 0, present: 0, lowest: 0, highest: 0, recorded: 0 }
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut rv = Vec::new();
+
+        rv.push(self.id);
+        rv.extend(self.present.to_be_bytes());
+        rv.extend(self.lowest.to_be_bytes());
+        rv.extend(self.highest.to_be_bytes());
+        rv.extend(self.recorded.to_be_bytes());
+
+        return rv;
+    }
+
+    pub fn deserialize(data : Vec<u8>) -> Option<SensorValuePD> {
+        if data.len() < 9 {
+            return None;
+        }
+
+        let mut pd = SensorValuePD::new();
+
+        pd.id = data[0];
+
+        pd.present = i16::from_be_bytes(data[1..3].try_into().unwrap());
+        pd.lowest = i16::from_be_bytes(data[3..5].try_into().unwrap());
+        pd.highest = i16::from_be_bytes(data[5..7].try_into().unwrap());
+        pd.recorded = i16::from_be_bytes(data[7..9].try_into().unwrap());
+
+        return Some(pd);
+
+    }
+
+
+}
+
+/********************************************************/
+/* Table A-12: Sensor Type Defines                      */
+/********************************************************/
+
+pub const SENS_TEMPERATURE                            : u8  = 0x00;
+pub const SENS_VOLTAGE                                : u8  = 0x01;
+pub const SENS_CURRENT                                : u8  = 0x02;
+pub const SENS_FREQUENCY                              : u8  = 0x03;
+pub const SENS_RESISTANCE                             : u8  = 0x04;  /* Eg: Cable resistance                                         */
+pub const SENS_POWER                                  : u8  = 0x05;
+pub const SENS_MASS                                   : u8  = 0x06;   /* Eg: Truss load Cell                                          */
+pub const SENS_LENGTH                                 : u8  = 0x07;
+pub const SENS_AREA                                   : u8  = 0x08;
+pub const SENS_VOLUME                                 : u8  = 0x09 ;  /* Eg: Smoke Fluid                                              */
+pub const SENS_DENSITY                                : u8  = 0x0A;
+pub const SENS_VELOCITY                               : u8  = 0x0B;
+pub const SENS_ACCELERATION                           : u8  = 0x0C;
+pub const SENS_FORCE                                  : u8  = 0x0D;
+pub const SENS_ENERGY                                 : u8  = 0x0E;
+pub const SENS_PRESSURE                               : u8  = 0x0F;
+pub const SENS_TIME                                   : u8  = 0x10;
+pub const SENS_ANGLE                                  : u8  = 0x11;
+pub const SENS_POSITION_X                             : u8  = 0x12 ;  /* E.g.: Lamp position on Truss                                 */
+pub const SENS_POSITION_Y                             : u8  = 0x13;
+pub const SENS_POSITION_Z                             : u8  = 0x14;
+pub const SENS_ANGULAR_VELOCITY                       : u8  = 0x15 ;  /* E.g.: Wind speed                                             */
+pub const SENS_LUMINOUS_INTENSITY                     : u8  = 0x16;
+pub const SENS_LUMINOUS_FLUX                          : u8  = 0x17;
+pub const SENS_ILLUMINANCE                            : u8  = 0x18;
+pub const SENS_CHROMINANCE_RED                        : u8  = 0x19;
+pub const SENS_CHROMINANCE_GREEN                      : u8  = 0x1A;
+pub const SENS_CHROMINANCE_BLUE                       : u8  = 0x1B;
+pub const SENS_CONTACTS                               : u8  = 0x1C ;  /* E.g.: Switch inputs.                                         */
+pub const SENS_MEMORY                                 : u8  = 0x1D  ; /* E.g.: ROM Size                                               */
+pub const SENS_ITEMS                                  : u8  = 0x1E   ;/* E.g.: Scroller gel frames.                                   */
+pub const SENS_HUMIDITY                               : u8  = 0x1F;
+pub const SENS_COUNTER_16BIT                          : u8  = 0x20;
+pub const SENS_OTHER                                  : u8  = 0x7F;
+/* Manufacturer-Specific Sensors                         : u8  = 0x;80-
+                                                         : u8  = 0xF;F                                                                   */
+
+/********************************************************/
+/* Table A-13: Sensor Unit Defines                      */
+/********************************************************/
+
+pub const UNITS_NONE                                  : u8  = 0x00;   /* CONTACTS                                                     */
+pub const UNITS_CENTIGRADE                            : u8  = 0x01;   /* TEMPERATURE	                                                */
+pub const UNITS_VOLTS_DC                              : u8  = 0x02;   /* VOLTAGE		                                                */
+pub const UNITS_VOLTS_AC_PEAK                         : u8  = 0x03;   /* VOLTAGE                                                      */
+pub const UNITS_VOLTS_AC_RMS                          : u8  = 0x04;   /* VOLTAGE                                                      */
+pub const UNITS_AMPERE_DC                             : u8  = 0x05;   /* CURRENT	                                                    */
+pub const UNITS_AMPERE_AC_PEAK                        : u8  = 0x06;   /* CURRENT	                                                    */
+pub const UNITS_AMPERE_AC_RMS                         : u8  = 0x07;   /* CURRENT                                                      */
+pub const UNITS_HERTZ                                 : u8  = 0x08;   /* FREQUENCY / ANG_VEL                                          */
+pub const UNITS_OHM                                   : u8  = 0x09;   /* RESISTANCE			                                        */
+pub const UNITS_WATT                                  : u8  = 0x0A;   /* POWER					                                    */
+pub const UNITS_KILOGRAM                              : u8  = 0x0B;   /* MASS                                                         */
+pub const UNITS_METERS                                : u8  = 0x0C;   /* LENGTH / POSITION		                                    */
+pub const UNITS_METERS_SQUARED                        : u8  = 0x0D;   /* AREA					                                        */
+pub const UNITS_METERS_CUBED                          : u8  = 0x0E;   /* VOLUME                                                       */
+pub const UNITS_KILOGRAMMES_PER_METER_CUBED           : u8  = 0x0F;   /* DENSITY                                                      */
+pub const UNITS_METERS_PER_SECOND                     : u8  = 0x10;   /* VELOCITY		                                                */
+pub const UNITS_METERS_PER_SECOND_SQUARED             : u8  = 0x11;   /* ACCELERATION	                                                */
+pub const UNITS_NEWTON                                : u8  = 0x12;   /* FORCE                                                        */
+pub const UNITS_JOULE                                 : u8  = 0x13;   /* ENERGY		                                                */
+pub const UNITS_PASCAL                                : u8  = 0x14;   /* PRESSURE		                                                */
+pub const UNITS_SECOND                                : u8  = 0x15;   /* TIME                                                         */
+pub const UNITS_DEGREE                                : u8  = 0x16;   /* ANGLE			                                            */
+pub const UNITS_STERADIAN                             : u8  = 0x17;   /* ANGLE			                                            */
+pub const UNITS_CANDELA                               : u8  = 0x18;   /* LUMINOUS_INTENSITY                                           */
+pub const UNITS_LUMEN                                 : u8  = 0x19;   /* LUMINOUS_FLUX		                                        */
+pub const UNITS_LUX                                   : u8  = 0x1A;   /* ILLUMINANCE		                                            */
+pub const UNITS_IRE                                   : u8  = 0x1B;   /* CHROMINANCE                                                  */
+pub const UNITS_BYTE                                  : u8  = 0x1C;   /* MEMORY	                                                    */
+/* Manufacturer-Specific Units                           : u8  = 0x80-
+ 				                                         : u8  = 0xFF				                                                    */
+
+
+/********************************************************/
+/* Table A-14: Sensor Unit Prefix Defines               */
+/********************************************************/
+
+pub const PREFIX_NONE                                 : u8  = 0x00;   /* Multiply by 1                                                */
+pub const PREFIX_DECI                                 : u8  = 0x01;   /* Multiply by 10-1	                                            */
+pub const PREFIX_CENTI                                : u8  = 0x02;   /* Multiply by 10-2	                                            */
+pub const PREFIX_MILLI                                : u8  = 0x03;   /* Multiply by 10-3	                                            */
+pub const PREFIX_MICRO                                : u8  = 0x04;   /* Multiply by 10-6	                                            */
+pub const PREFIX_NANO                                 : u8  = 0x05;   /* Multiply by 10-9	                                            */
+pub const PREFIX_PICO                                 : u8  = 0x06;   /* Multiply by 10-12	                                        */
+pub const PREFIX_FEMPTO                               : u8  = 0x07;   /* Multiply by 10-15	                                        */
+pub const PREFIX_ATTO                                 : u8  = 0x08;   /* Multiply by 10-18	                                        */
+pub const PREFIX_ZEPTO                                : u8  = 0x09;   /* Multiply by 10-21	                                        */
+pub const PREFIX_YOCTO                                : u8  = 0x0A;   /* Multiply by 10-24	                                        */
+pub const PREFIX_DECA                                 : u8  = 0x11;   /* Multiply by 10+1	                                            */
+pub const PREFIX_HECTO                                : u8  = 0x12;   /* Multiply by 10+2	                                            */
+pub const PREFIX_KILO                                 : u8  = 0x13;   /* Multiply by 10+3	                                            */
+pub const PREFIX_MEGA                                 : u8  = 0x14;   /* Multiply by 10+6	                                            */
+pub const PREFIX_GIGA                                 : u8  = 0x15;   /* Multiply by 10+9	                                            */
+pub const PREFIX_TERRA                                : u8  = 0x16;   /* Multiply by 10+12	                                        */
+pub const PREFIX_PETA                                 : u8  = 0x17;   /* Multiply by 10+15	                                        */
+pub const PREFIX_EXA                                  : u8  = 0x18;   /* Multiply by 10+18	                                        */
+pub const PREFIX_ZETTA                                : u8  = 0x19;   /* Multiply by 10+21	                                        */
+pub const PREFIX_YOTTA                                : u8  = 0x1A;   /* Multiply by 10+24	                                        */
+
+
+
 // Just compare them as 64s
 impl PartialOrd for Uid {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -593,36 +849,47 @@ fn do_discovery_node(f: fn(&[u8]) -> Option<Vec<u8>>,my_uid: &Uid, min: &Uid, ma
 /// 2. Check left-hand side of tree and gather UIDs
 /// 3. Check right-hand side of tree and gather UIDs
 /// 4. Concatenate and return
-pub fn do_discovery_algo(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid) -> Vec<Uid> {
+pub fn do_discovery_algo(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, do_mute: bool, repeat_disc: bool) -> Vec<Uid> {
 
     let mut tn : u8 = 0;
 
-    let mut output_pkt = Pkt::new();
+    if do_mute {
+        let mut output_pkt = Pkt::new();
 
-    output_pkt.destination = Uid::new(0xFFFF,0xFFFF_FFFF);
-    output_pkt.source = my_uid.clone();
-    
-    tn = tn.overflowing_add(1).0;
+        output_pkt.destination = Uid::new(0xFFFF,0xFFFF_FFFF);
+        output_pkt.source = my_uid.clone();
+        
+        tn = tn.overflowing_add(1).0;
 
-    output_pkt.tn = tn;
+        output_pkt.tn = tn;
 
-    output_pkt.port_or_response_type = 0x01;
+        output_pkt.port_or_response_type = 0x01;
 
-    output_pkt.cc = DISCOVERY_COMMAND;
+        output_pkt.cc = DISCOVERY_COMMAND;
 
-    output_pkt.pid = DISC_UN_MUTE;
+        output_pkt.pid = DISC_UN_MUTE;
 
-    output_pkt.pdl = 0x00;
+        output_pkt.pdl = 0x00;
 
-    output_pkt.set_message_length(); // sets message length from PDL
-    output_pkt.set_checksum(); // sets checksum from the whole packet.
+        output_pkt.set_message_length(); // sets message length from PDL
+        output_pkt.set_checksum(); // sets checksum from the whole packet.
 
-    f(output_pkt.serialize().as_slice()); /// send global unmute
+        f(output_pkt.serialize().as_slice()); // send global unmute
+
+    }
 
     let min : Uid = Uid::new(0,0); 
     let max : Uid = Uid::new(0x7FFF, 0xFFFF_FFFF);
 
-    let tod = do_discovery_recursion(f, &my_uid, &min, &max, &mut tn);
+    let mut tod = do_discovery_recursion(f, &my_uid, &min, &max, &mut tn,repeat_disc);
+
+    if repeat_disc && tod.len() == 0 {
+        tod = do_discovery_recursion(f, &my_uid, &min, &max, &mut tn,repeat_disc);
+    }
+
+    if repeat_disc && tod.len() == 0 {
+        tod = do_discovery_recursion(f, &my_uid, &min, &max, &mut tn,repeat_disc);
+    }
 
     return tod;
 }
@@ -678,7 +945,7 @@ fn send_mute_message(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, uid: &Uid, t
 
 }
 
-fn do_discovery_recursion(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, min: &Uid, max: &Uid, tn : &mut u8) -> Vec<Uid> {
+fn do_discovery_recursion(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, min: &Uid, max: &Uid, tn : &mut u8, repeat_disc: bool) -> Vec<Uid> {
     let mut tod : Vec<Uid> = Vec::new();
 
     debug!("do_discovery_recursion({},{})",min,max);
@@ -704,8 +971,36 @@ fn do_discovery_recursion(f: fn(&[u8]) -> Option<Vec<u8>>, my_uid: &Uid, min: &U
 
     // println!("Midpoint is {}", mid);
 
-    tod.append(do_discovery_recursion(f,&my_uid, min,&mid, tn).as_mut());
-    tod.append(do_discovery_recursion(f,&my_uid, &mid,max, tn).as_mut());
+    // Do the left branch.
+    let left_branch = do_discovery_recursion(f,&my_uid, min,&mid, tn, repeat_disc);
+
+    if repeat_disc && left_branch.len() == 0 {
+        let left_branch = do_discovery_recursion(f,&my_uid, min,&mid, tn, repeat_disc);
+        if left_branch.len() == 0 {
+            let left_branch = do_discovery_recursion(f,&my_uid, min,&mid, tn, repeat_disc);
+            tod.extend(left_branch);
+        } else {
+            tod.extend(left_branch);
+        }
+    } else {
+        tod.extend(left_branch); // extend tod with the contents of left branch here even if we don't repeat discovery
+    }
+
+    // now do the right branch
+    let right_branch = do_discovery_recursion(f,&my_uid, &mid,max, tn, repeat_disc);
+    if repeat_disc && right_branch.len() == 0 {
+        let right_branch = do_discovery_recursion(f,&my_uid, &mid,max, tn, repeat_disc);
+        if right_branch.len() == 0 {
+            let right_branch = do_discovery_recursion(f,&my_uid, &mid,max, tn, repeat_disc);
+            tod.extend(right_branch);
+        } else {
+            tod.extend(right_branch);
+        }
+    } else {
+        tod.extend(right_branch);
+    }
+
+   
     
     return tod;
 
