@@ -6,32 +6,32 @@ use e1_20::*;
 
 use simplelog::*;
 
-// OK, so we need to pass a function that can accept a string of RDM data and then return the response.   
-// Response should actually be an Option so we can do Some or None 
+// OK, so we need to pass a function that can accept a string of RDM data and then return the response.
+// Response should actually be an Option so we can do Some or None
 
 fn fake_rdm(data: &[u8]) -> Option<Vec<u8>> {
-
     // println!("fake_rdm: {:?}",data);
 
-    let uid_list : Vec<Uid> = vec![Uid::new(0x3638,0x08101AD8),
-    Uid::new(0x646F,0x000E8E22),
-    Uid::new(0x646F,0x000FB190),
-    Uid::new(0x3638,0x27106D31),
-    Uid::new(0x3638,0x0B101307),
-    Uid::new(0x646F,0x000FB118),
-    Uid::new(0x6574,0x1B69D0FE),
-    Uid::new(0x646F,0x000FA98D),
-    Uid::new(0x3638,0x4110280F),
-    Uid::new(0x3638,0x0B101323)];
+    let uid_list: Vec<Uid> = vec![
+        Uid::new(0x3638, 0x08101AD8),
+        Uid::new(0x646F, 0x000E8E22),
+        Uid::new(0x646F, 0x000FB190),
+        Uid::new(0x3638, 0x27106D31),
+        Uid::new(0x3638, 0x0B101307),
+        Uid::new(0x646F, 0x000FB118),
+        Uid::new(0x6574, 0x1B69D0FE),
+        Uid::new(0x646F, 0x000FA98D),
+        Uid::new(0x3638, 0x4110280F),
+        Uid::new(0x3638, 0x0B101323),
+    ];
 
     let packet = Pkt::deserialize(data.to_vec()).unwrap();
 
     if packet.pid == DISC_UNIQUE_BRANCH {
-        
         let min = Uid::from_bytes(&packet.pd[0..6]);
         let max = Uid::from_bytes(&packet.pd[6..12]);
 
-        let mut uid_found : Vec<Uid> = Vec::new();
+        let mut uid_found: Vec<Uid> = Vec::new();
 
         for uid in uid_list {
             if (uid <= max) && (uid >= min) {
@@ -44,10 +44,10 @@ fn fake_rdm(data: &[u8]) -> Option<Vec<u8>> {
             return None;
         } else if uid_found.len() == 1 {
             debug!("Found one: {}", uid_found[0]);
-            let uid_buffer = uid_found[0].serialize();
-            let mut buffer : [u8; 24] = [0xFE; 24];
+            let uid_buffer = uid_found[0].uid_serialize();
+            let mut buffer: [u8; 24] = [0xFE; 24];
             buffer[7] = 0xAA;
-            
+
             buffer[8] = uid_buffer[0] | 0xAA;
             buffer[9] = uid_buffer[0] | 0x55;
 
@@ -66,7 +66,7 @@ fn fake_rdm(data: &[u8]) -> Option<Vec<u8>> {
             buffer[18] = uid_buffer[5] | 0xAA;
             buffer[19] = uid_buffer[5] | 0x55;
 
-            let mut crc : u16 = 0;
+            let mut crc: u16 = 0;
 
             for byte in &buffer[8..20] {
                 crc = crc.overflowing_add(*byte as u16).0;
@@ -84,15 +84,12 @@ fn fake_rdm(data: &[u8]) -> Option<Vec<u8>> {
         } else {
             return Some(data.to_vec());
         }
-
-       
-
     }
 
     if packet.pid == DISC_MUTE {
         for uid in uid_list {
             if packet.destination == uid {
-                debug!("Got DISC_MUTE for {}",uid);
+                debug!("Got DISC_MUTE for {}", uid);
                 let mut response = Pkt::new();
                 response.source = uid;
                 response.destination = packet.source;
@@ -110,11 +107,8 @@ fn fake_rdm(data: &[u8]) -> Option<Vec<u8>> {
         }
     }
 
-    
-
     return None;
 }
-
 
 fn main() {
     // Statements here are executed when the compiled binary is called
@@ -132,9 +126,7 @@ fn main() {
     // Print text to the console
     println!("Hello World!");
 
-    let my_uid = Uid::new(0x044E,0x01);
+    let my_uid = Uid::new(0x044E, 0x01);
 
-    println!("{:?}", do_discovery_algo(fake_rdm,&my_uid,false,false));
-
-   
+    println!("{:?}", do_discovery_algo(fake_rdm, &my_uid, false, false));
 }

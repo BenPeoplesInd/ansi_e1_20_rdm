@@ -11,6 +11,8 @@ use std::str;
 use std::u32;
 use std::u16;
 
+use serde::{Deserialize, Serialize};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,7 +209,7 @@ pub const POWER_ON_SELF_TEST                         : u16 = 0x1044; /* Defined 
 /// This contains the manufacturer and device ids
 /// Implementations will include the ability to format as MMMM:DDDDDDDD as well as strings of bytes
 /// 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Uid {
     pub mfg : u16,
     pub dev : u32
@@ -215,7 +217,7 @@ pub struct Uid {
 
 impl Uid {
 
-    pub fn serialize(self) -> [u8; 6] {
+    pub fn uid_serialize(self) -> [u8; 6] {
         let mfg : [u8; 2] = self.mfg.to_be_bytes();
         let dev : [u8; 4] = self.dev.to_be_bytes();
 
@@ -424,8 +426,8 @@ impl Pkt {
         data.push(self.start);
         data.push(self.substart);
         data.push(self.message_length);
-        data.extend(self.destination.serialize());
-        data.extend(self.source.serialize());
+        data.extend(self.destination.uid_serialize());
+        data.extend(self.source.uid_serialize());
         data.push(self.tn);
         data.push(self.port_or_response_type);
         data.push(self.message_count);
@@ -888,8 +890,8 @@ fn do_discovery_node(f: fn(&[u8]) -> Option<Vec<u8>>,my_uid: &Uid, min: &Uid, ma
 
     output_pkt.pdl = 0x0C;
 
-    output_pkt.pd.extend(min.serialize());
-    output_pkt.pd.extend(max.serialize());
+    output_pkt.pd.extend(min.uid_serialize());
+    output_pkt.pd.extend(max.uid_serialize());
 
     output_pkt.set_message_length(); // sets message length from PDL
     output_pkt.set_checksum(); // sets checksum from the whole packet.
