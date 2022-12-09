@@ -502,6 +502,118 @@ impl PartialEq for Uid {
 }
 
 #[derive(Debug)]
+pub struct DeviceLabelPD {
+    pub device_label : String
+}
+
+impl DeviceLabelPD {
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut rv = Vec::new();
+
+        rv.extend(self.device_label.as_bytes());
+
+        return rv;
+
+    }
+
+    pub fn deserialize(data: Vec<u8>) -> Option<DeviceLabelPD> {
+
+        let mut pd = DeviceLabelPD::new();
+
+        if data.len() == 0 {
+            return Some(pd);
+        }
+
+        let mut last_index = data.len();
+
+        for i in 0..data.len() {
+            if data[i] == 0x00 { // if it's a null terminated string, truncate here.
+                last_index = i;
+                break;
+            }
+        }
+        
+        pd.device_label = str::from_utf8(&data[0..last_index]).unwrap_or("").to_string();
+        
+        return Some(pd);
+    }
+
+    pub fn new() -> DeviceLabelPD {
+        DeviceLabelPD { device_label: "".to_string() }
+    }
+}
+
+#[derive(Debug)]
+pub struct DeviceInfoPD {
+    pub rdm_protocol_version : u16,
+    pub device_model_id : u16,
+    pub product_category : u16,
+    pub software_version_id : u32,
+    pub dmx_footprint: u16,
+    pub dmx_personality : u16,
+    pub dmx_start_address : u16,
+    pub sub_device_count : u16,
+    pub sensor_count : u8
+}
+
+impl DeviceInfoPD {
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut rv = Vec::new();
+
+        rv.extend(self.rdm_protocol_version.to_be_bytes());
+        rv.extend(self.device_model_id.to_be_bytes());
+        rv.extend(self.product_category.to_be_bytes());
+        rv.extend(self.software_version_id.to_be_bytes());
+        rv.extend(self.dmx_footprint.to_be_bytes());
+        rv.extend(self.dmx_personality.to_be_bytes());
+        rv.extend(self.dmx_start_address.to_be_bytes());
+        rv.extend(self.sub_device_count.to_be_bytes());
+
+        rv.push(self.sensor_count);
+        
+        return rv;
+    }
+
+    pub fn deserialize(data : Vec<u8>) -> Option<DeviceInfoPD> {
+        if data.len() < 0x13 {
+            return None;
+        }
+
+        let mut pd = DeviceInfoPD::new();
+
+        pd.rdm_protocol_version = u16::from_be_bytes(data[0..2].try_into().unwrap());
+        pd.device_model_id = u16::from_be_bytes(data[2..4].try_into().unwrap());
+        pd.product_category = u16::from_be_bytes(data[4..6].try_into().unwrap());
+        pd.software_version_id = u32::from_be_bytes(data[6..10].try_into().unwrap());
+        pd.dmx_footprint = u16::from_be_bytes(data[10..12].try_into().unwrap());
+        pd.dmx_personality = u16::from_be_bytes(data[12..14].try_into().unwrap());
+        pd.dmx_start_address = u16::from_be_bytes(data[14..16].try_into().unwrap());
+        pd.sub_device_count = u16::from_be_bytes(data[16..18].try_into().unwrap());
+
+        pd.sensor_count = data[18];
+
+        return Some(pd);
+
+    }
+
+    pub fn new() -> DeviceInfoPD {
+        DeviceInfoPD { 
+            rdm_protocol_version: 0, 
+            device_model_id: 0, 
+            product_category: 0, 
+            software_version_id: 0, 
+            dmx_footprint: 0, 
+            dmx_personality: 0, 
+            dmx_start_address: 0, 
+            sub_device_count: 0, 
+            sensor_count: 0 
+        }   
+
+    }
+
+}
+
+#[derive(Debug)]
 pub struct SensorDefinitionPD {
     pub id : u8,
     pub sensor_type : u8,
