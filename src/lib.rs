@@ -457,7 +457,7 @@ impl Pkt {
         ret.substart = data[1];
         ret.message_length = data[2];
 
-        if data.len() < (ret.message_length as usize) + 2 {
+        if data.len() != (ret.message_length as usize) + 2 {
             error!("data.len was incorrect got {} wanted {}",data.len(),ret.message_length+2);
             return None; // May want some more useful errors later
         }
